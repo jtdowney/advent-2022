@@ -32,6 +32,5 @@ fn part2(input: &[Vec<usize>]) -> usize {
         .map(|values| values.iter().sum::<usize>())
         .collect::<Vec<usize>>();
     totals.sort_unstable();
-    totals.reverse();
-    totals.iter().take(3).sum()
+    totals.iter().rev().take(3).sum()
 }

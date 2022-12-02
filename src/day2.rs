@@ -3,26 +3,33 @@ use eyre::ContextCompat;
 
 #[derive(Debug, Copy, Clone)]
 enum Outcome {
-    Win,
-    Loss,
-    Draw,
+    Loss = 0,
+    Draw = 3,
+    Win = 6,
 }
 
 impl Outcome {
     fn score(self) -> usize {
-        match self {
-            Outcome::Win => 6,
-            Outcome::Loss => 0,
-            Outcome::Draw => 3,
-        }
+        self as usize
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum Play {
-    Rock,
-    Paper,
-    Scissors,
+    Rock = 0,
+    Paper = 1,
+    Scissors = 2,
+}
+
+impl From<i8> for Play {
+    fn from(play: i8) -> Self {
+        match play {
+            0 => Play::Rock,
+            1 => Play::Paper,
+            2 => Play::Scissors,
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl From<char> for Play {
@@ -37,42 +44,29 @@ impl From<char> for Play {
 }
 
 impl Play {
+    fn find_loss(self) -> Play {
+        let value = self as i8;
+        let loss = (value - 1).rem_euclid(3);
+        Play::from(loss)
+    }
+
+    fn find_win(self) -> Play {
+        let value = self as i8;
+        let win = (value + 1).rem_euclid(3);
+        Play::from(win)
+    }
+
     fn play(self, other: Play) -> Outcome {
         match (self, other) {
-            (Play::Rock, Play::Rock) => Outcome::Draw,
-            (Play::Rock, Play::Paper) => Outcome::Loss,
-            (Play::Rock, Play::Scissors) => Outcome::Win,
-            (Play::Paper, Play::Rock) => Outcome::Win,
-            (Play::Paper, Play::Paper) => Outcome::Draw,
-            (Play::Paper, Play::Scissors) => Outcome::Loss,
-            (Play::Scissors, Play::Rock) => Outcome::Loss,
-            (Play::Scissors, Play::Paper) => Outcome::Win,
-            (Play::Scissors, Play::Scissors) => Outcome::Draw,
+            (a, b) if a == b => Outcome::Draw,
+            (a, b) if a.find_win() == b => Outcome::Loss,
+            (a, b) if a.find_loss() == b => Outcome::Win,
+            _ => unreachable!(),
         }
     }
 
     fn score(self) -> usize {
-        match self {
-            Play::Rock => 1,
-            Play::Paper => 2,
-            Play::Scissors => 3,
-        }
-    }
-
-    fn find_win(self) -> Play {
-        match self {
-            Play::Rock => Play::Paper,
-            Play::Paper => Play::Scissors,
-            Play::Scissors => Play::Rock,
-        }
-    }
-
-    fn find_loss(self) -> Play {
-        match self {
-            Play::Rock => Play::Scissors,
-            Play::Paper => Play::Rock,
-            Play::Scissors => Play::Paper,
-        }
+        (self as usize) + 1
     }
 }
 

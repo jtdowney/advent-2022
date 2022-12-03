@@ -20,15 +20,13 @@ fn part1(input: &[String]) -> usize {
     input
         .iter()
         .map(|sack| {
-            let length = sack.len();
             let chars = sack.chars().collect::<Vec<_>>();
-            let (left, right) = chars.split_at(length / 2);
+            let (left, right) = chars.split_at(sack.len() / 2);
 
             let left = left.iter().collect::<HashSet<_>>();
             let right = right.iter().collect::<HashSet<_>>();
-            (&left & &right)
-                .into_iter()
-                .map(|&c| priority(c) as usize)
+            left.intersection(&right)
+                .map(|&c| priority(*c) as usize)
                 .sum::<usize>()
         })
         .sum::<usize>()

@@ -16,7 +16,7 @@ fn generator(input: &str) -> Vec<String> {
 }
 
 #[aoc(day3, part1)]
-fn part1(input: &[String]) -> usize {
+fn part1(input: &[String]) -> u32 {
     input
         .iter()
         .map(|sack| {
@@ -26,14 +26,14 @@ fn part1(input: &[String]) -> usize {
             let left = left.iter().collect::<HashSet<_>>();
             let right = right.iter().collect::<HashSet<_>>();
             left.intersection(&right)
-                .map(|&c| priority(*c) as usize)
-                .sum::<usize>()
+                .map(|&c| priority(*c))
+                .sum::<u32>()
         })
-        .sum::<usize>()
+        .sum()
 }
 
 #[aoc(day3, part2)]
-fn part2(input: &[String]) -> usize {
+fn part2(input: &[String]) -> u32 {
     input
         .chunks(3)
         .map(|sacks| {
@@ -44,8 +44,8 @@ fn part2(input: &[String]) -> usize {
 
             badges
                 .iter()
-                .map(|chars| chars.iter().map(|&c| priority(c) as usize).sum::<usize>())
-                .sum::<usize>()
+                .map(|chars| chars.iter().map(|&c| priority(c)).sum::<u32>())
+                .sum::<u32>()
         })
-        .sum::<usize>()
+        .sum()
 }

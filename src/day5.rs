@@ -3,25 +3,19 @@ use std::collections::{BTreeMap, HashMap};
 use aoc_runner_derive::{aoc, aoc_generator};
 use eyre::ContextCompat;
 
-#[derive(Copy, Clone, Debug)]
 struct Instruction {
     count: usize,
     source: u32,
     destination: u32,
 }
 
-#[derive(Debug)]
 struct Input {
     stacks: BTreeMap<u32, Vec<char>>,
     instructions: Vec<Instruction>,
 }
 
-#[aoc_generator(day5)]
-fn generator(input: &str) -> eyre::Result<Input> {
-    let mut parts = input.split("\n\n");
-
-    let stack_part = parts.next().context("reading stacks")?;
-    let mut lines = stack_part.lines().rev();
+fn parse_stacks(input: &str) -> eyre::Result<BTreeMap<u32, Vec<char>>> {
+    let mut lines = input.lines().rev();
     let labels = lines
         .next()
         .map(|line| {
@@ -31,9 +25,10 @@ fn generator(input: &str) -> eyre::Result<Input> {
                 .collect::<HashMap<usize, u32>>()
         })
         .context("parsing labels")?;
+
     let stacks = lines.fold(BTreeMap::<u32, Vec<char>>::new(), |mut acc, line| {
         for (i, c) in line.chars().enumerate() {
-            if c.is_whitespace() {
+            if !c.is_ascii_alphabetic() {
                 continue;
             }
 
@@ -48,8 +43,11 @@ fn generator(input: &str) -> eyre::Result<Input> {
         acc
     });
 
-    let instruction_part = parts.next().context("reading instructions")?;
-    let instructions = instruction_part
+    Ok(stacks)
+}
+
+fn parse_instructions(input: &str) -> eyre::Result<Vec<Instruction>> {
+    input
         .lines()
         .map(|line| {
             let mut parts = line.split_whitespace();
@@ -66,7 +64,21 @@ fn generator(input: &str) -> eyre::Result<Input> {
             })
         })
         .collect::<Option<Vec<_>>>()
-        .context("parsing instructions")?;
+        .context("parsing instructions")
+}
+
+#[aoc_generator(day5)]
+fn generator(input: &str) -> eyre::Result<Input> {
+    let mut parts = input.split("\n\n");
+
+    let stacks = parts
+        .next()
+        .context("reading stacks")
+        .and_then(parse_stacks)?;
+    let instructions = parts
+        .next()
+        .context("reading instructions")
+        .and_then(parse_instructions)?;
 
     Ok(Input {
         stacks,
@@ -84,17 +96,16 @@ fn part1(input: &Input) -> eyre::Result<String> {
              source,
              destination,
          }| {
-            let mut temp = vec![];
             let source_stack = stacks.get_mut(&source).context("getting source")?;
-            for _ in 0..count {
-                let value = source_stack.pop().context("popping stack")?;
-                temp.push(value);
-            }
+            let mut moving = source_stack
+                .drain((source_stack.len() - count)..)
+                .collect::<Vec<_>>();
+            moving.reverse();
 
             let destination_stack = stacks
                 .get_mut(&destination)
                 .context("getting destination")?;
-            destination_stack.extend_from_slice(&temp);
+            destination_stack.extend_from_slice(&moving);
 
             Ok::<_, eyre::Report>(stacks)
         },
@@ -114,19 +125,15 @@ fn part2(input: &Input) -> eyre::Result<String> {
              source,
              destination,
          }| {
-            let mut temp = vec![];
             let source_stack = stacks.get_mut(&source).context("getting source")?;
-            for _ in 0..count {
-                let value = source_stack.pop().context("popping stack")?;
-                temp.push(value);
-            }
+            let moving = source_stack
+                .drain((source_stack.len() - count)..)
+                .collect::<Vec<_>>();
 
             let destination_stack = stacks
                 .get_mut(&destination)
                 .context("getting destination")?;
-
-            temp.reverse();
-            destination_stack.extend_from_slice(&temp);
+            destination_stack.extend_from_slice(&moving);
 
             Ok::<_, eyre::Report>(stacks)
         },

@@ -2,12 +2,6 @@ use std::collections::{BTreeMap, HashMap};
 
 use aoc_runner_derive::{aoc, aoc_generator};
 use eyre::ContextCompat;
-use once_cell::sync::Lazy;
-use regex::Regex;
-
-static REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^move (?P<count>\d+) from (?P<source>\d+) to (?P<destination>\d+)$").unwrap()
-});
 
 #[derive(Copy, Clone, Debug)]
 struct Instruction {
@@ -58,16 +52,13 @@ fn generator(input: &str) -> eyre::Result<Input> {
     let instructions = instruction_part
         .lines()
         .map(|line| {
-            let captures = REGEX.captures(line)?;
-            let count = captures
-                .name("count")
-                .and_then(|m| m.as_str().parse().ok())?;
-            let source = captures
-                .name("source")
-                .and_then(|m| m.as_str().parse().ok())?;
-            let destination = captures
-                .name("destination")
-                .and_then(|m| m.as_str().parse().ok())?;
+            let mut parts = line.split_whitespace();
+            let _ = parts.next()?;
+            let count = parts.next().and_then(|m| m.parse().ok())?;
+            let _ = parts.next()?;
+            let source = parts.next().and_then(|m| m.parse().ok())?;
+            let _ = parts.next()?;
+            let destination = parts.next().and_then(|m| m.parse().ok())?;
             Some(Instruction {
                 count,
                 source,

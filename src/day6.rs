@@ -3,14 +3,13 @@ use std::collections::HashSet;
 use aoc_runner_derive::aoc;
 
 fn solve(input: &[u8], length: usize) -> Option<usize> {
-    input.windows(length).enumerate().find_map(|(i, window)| {
-        let set = window.iter().collect::<HashSet<_>>();
-        if set.len() == length {
-            Some(i + length)
-        } else {
-            None
-        }
-    })
+    input
+        .windows(length)
+        .position(|window| {
+            let set = window.iter().collect::<HashSet<_>>();
+            set.len() == length
+        })
+        .map(|i| i + length)
 }
 
 #[aoc(day6, part1)]

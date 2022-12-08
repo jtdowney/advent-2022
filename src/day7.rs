@@ -4,9 +4,10 @@ use aoc_runner_derive::{aoc, aoc_generator};
 use eyre::bail;
 use nom::{
     branch::alt,
-    bytes::complete::tag,
-    character::complete::space1,
-    combinator::{map, rest},
+    bytes::complete::{tag, take_while1},
+    character::complete::{space1, u32},
+    combinator::map,
+    sequence::{preceded, separated_pair, tuple},
     Finish, IResult,
 };
 
@@ -17,51 +18,38 @@ enum Token {
     OutputDirectory { name: String },
 }
 
-enum Entry {
-    Directory { children: Vec<String> },
-    File { size: u32 },
-}
-
-fn parse_cd_command(input: &str) -> IResult<&str, Token> {
-    let (input, _) = tag("cd")(input)?;
-    let (input, _) = space1(input)?;
-    map(rest, |target: &str| Token::ChangeDirectory {
-        target: target.to_owned(),
-    })(input)
-}
-
-fn parse_ls_command(input: &str) -> IResult<&str, Token> {
-    let (input, _) = tag("ls")(input)?;
-    Ok((input, Token::List))
+fn parse_path(input: &str) -> IResult<&str, String> {
+    map(
+        take_while1(|c: char| c.is_ascii_alphabetic() || c == '.' || c == '/'),
+        String::from,
+    )(input)
 }
 
 fn parse_command(input: &str) -> IResult<&str, Token> {
-    let (input, _) = tag("$")(input)?;
-    let (input, _) = space1(input)?;
-    alt((parse_cd_command, parse_ls_command))(input)
+    let parse_ls = map(tag("ls"), |_| Token::List);
+    let parse_cd = map(preceded(tuple((tag("cd"), space1)), parse_path), |target| {
+        Token::ChangeDirectory { target }
+    });
+    preceded(tuple((tag("$"), space1)), alt((parse_cd, parse_ls)))(input)
 }
 
-fn parse_output_directory(input: &str) -> IResult<&str, Token> {
-    let (input, _) = tag("dir")(input)?;
-    let (input, _) = space1(input)?;
-    map(rest, |name: &str| Token::OutputDirectory {
-        name: name.to_owned(),
-    })(input)
-}
-
-fn parse_output_file(input: &str) -> IResult<&str, Token> {
-    let (input, size) = nom::character::complete::u32(input)?;
-    let (input, _) = space1(input)?;
-    let (input, token) = map(rest, |name: &str| Token::OutputFile {
-        name: name.to_owned(),
-        size,
-    })(input)?;
-
-    Ok((input, token))
+fn parse_output(input: &str) -> IResult<&str, Token> {
+    let parse_directory = map(preceded(tuple((tag("dir"), space1)), parse_path), |name| {
+        Token::OutputDirectory { name }
+    });
+    let parse_file = map(separated_pair(u32, space1, parse_path), |(size, name)| {
+        Token::OutputFile { name, size }
+    });
+    alt((parse_directory, parse_file))(input)
 }
 
 fn parse_token(input: &str) -> IResult<&str, Token> {
-    alt((parse_command, parse_output_directory, parse_output_file))(input)
+    alt((parse_command, parse_output))(input)
+}
+
+enum Entry {
+    Directory { children: Vec<String> },
+    File { size: u32 },
 }
 
 type FileSystem = HashMap<PathBuf, Entry>;
@@ -97,9 +85,9 @@ fn tokenize(input: &str) -> eyre::Result<Vec<Token>> {
         .collect::<Result<Vec<Token>, _>>()
 }
 
-fn build_filesystem(tokens: &[Token]) -> eyre::Result<FileSystem> {
+fn build_filesystem(tokens: Vec<Token>) -> eyre::Result<FileSystem> {
     let state = tokens
-        .iter()
+        .into_iter()
         .try_fold(WalkState::default(), |mut walk, token| {
             match token {
                 Token::ChangeDirectory { target } => {
@@ -111,32 +99,30 @@ fn build_filesystem(tokens: &[Token]) -> eyre::Result<FileSystem> {
                 }
                 Token::List => {}
                 Token::OutputFile { name, size } => {
-                    let path = walk.current_directory.join(name);
-                    walk.filesystem.insert(path, Entry::File { size: *size });
-                    walk.filesystem
-                        .entry(walk.current_directory.clone())
-                        .and_modify(|dir| {
-                            let Entry::Directory { children, .. } = dir else {
-                                panic!("trying to add a file to a non-directory")
-                            };
+                    let path = walk.current_directory.join(&name);
+                    walk.filesystem.insert(path, Entry::File { size });
 
-                            children.push(name.clone());
-                        });
+                    if let Some(dir) = walk.filesystem.get_mut(&walk.current_directory) {
+                        let Entry::Directory { children, .. } = dir else {
+                            panic!("trying to add a file to a non-directory")
+                        };
+
+                        children.push(name);
+                    }
                 }
                 Token::OutputDirectory { name } => {
-                    let path = walk.current_directory.join(name);
+                    let path = walk.current_directory.join(&name);
                     walk.filesystem
                         .entry(path)
                         .or_insert_with(|| Entry::Directory { children: vec![] });
-                    walk.filesystem
-                        .entry(walk.current_directory.clone())
-                        .and_modify(|dir| {
-                            let Entry::Directory { children, .. } = dir else {
-                                panic!("trying to add a directory to a non-directory")
-                            };
 
-                            children.push(name.clone());
-                        });
+                    if let Some(dir) = walk.filesystem.get_mut(&walk.current_directory) {
+                        let Entry::Directory { children, .. } = dir else {
+                            panic!("trying to add a file to a non-directory")
+                        };
+
+                        children.push(name);
+                    }
                 }
             }
 
@@ -187,7 +173,7 @@ fn find_sizes(filesystem: &FileSystem) -> eyre::Result<HashMap<PathBuf, usize>> 
 #[aoc_generator(day7)]
 fn generator(input: &str) -> eyre::Result<HashMap<PathBuf, usize>> {
     let tokens = tokenize(input)?;
-    let filesystem = build_filesystem(&tokens)?;
+    let filesystem = build_filesystem(tokens)?;
     find_sizes(&filesystem)
 }
 

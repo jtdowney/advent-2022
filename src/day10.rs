@@ -9,6 +9,7 @@ use nom::{
     sequence::{preceded, tuple},
     IResult,
 };
+use smallvec::{smallvec, SmallVec};
 
 enum Instruction {
     Noop,
@@ -39,11 +40,11 @@ fn execute(instructions: &[Instruction]) -> impl Iterator<Item = i32> + '_ {
     instructions
         .iter()
         .scan(1, |state, instruction| match instruction {
-            Instruction::Noop => Some(vec![*state]),
+            Instruction::Noop => Some::<SmallVec<[i32; 2]>>(smallvec![*state]),
             Instruction::AddX(value) => {
                 let x = *state;
                 *state += value;
-                Some(vec![x, x])
+                Some(smallvec![x, x])
             }
         })
         .flatten()

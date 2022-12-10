@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use aoc_runner_derive::{aoc, aoc_generator};
 use eyre::bail;
 use itertools::iproduct;
@@ -12,22 +10,9 @@ use nom::{
     IResult,
 };
 
-#[derive(Copy, Clone, Debug)]
 enum Instruction {
     Noop,
     AddX(i32),
-}
-
-#[derive(Copy, Clone, Debug)]
-struct State {
-    x: i32,
-    cycle: usize,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        State { x: 1, cycle: 0 }
-    }
 }
 
 fn parse_instruction(input: &str) -> IResult<&str, Instruction> {
@@ -50,56 +35,46 @@ fn generator(input: &str) -> eyre::Result<Vec<Instruction>> {
         .collect()
 }
 
-fn execute(instructions: &[Instruction]) -> impl Iterator<Item = (usize, i32)> + '_ {
+fn execute(instructions: &[Instruction]) -> impl Iterator<Item = i32> + '_ {
     instructions
         .iter()
-        .scan(
-            State::default(),
-            |mut state, instruction| match instruction {
-                Instruction::Noop => {
-                    state.cycle += 1;
-                    Some(vec![(state.cycle, state.x)])
-                }
-                Instruction::AddX(value) => {
-                    let cycle = state.cycle;
-                    let x = state.x;
-
-                    state.cycle += 2;
-                    state.x += value;
-
-                    Some(vec![(cycle + 1, x), (cycle + 2, x)])
-                }
-            },
-        )
+        .scan(1, |state, instruction| match instruction {
+            Instruction::Noop => Some(vec![*state]),
+            Instruction::AddX(value) => {
+                let x = *state;
+                *state += value;
+                Some(vec![x, x])
+            }
+        })
         .flatten()
 }
 
 #[aoc(day10, part1)]
 fn part1(input: &[Instruction]) -> i32 {
-    let output = execute(input).collect::<HashMap<_, _>>();
-
-    [20, 60, 100, 140, 180, 220]
-        .iter()
-        .map(|&i| output[&i] * i as i32)
+    execute(input)
+        .enumerate()
+        .skip(19)
+        .step_by(40)
+        .map(|(i, x)| (i + 1) as i32 * x)
         .sum()
 }
 
 #[aoc(day10, part2)]
 fn part2(input: &[Instruction]) -> String {
     iproduct!((0..6), (0..40)).zip(execute(input)).fold(
-        String::new(),
-        |mut output, ((_, x), (_, sprite))| {
+        String::with_capacity(6 * 40 + 6),
+        |mut acc, ((_, x), sprite)| {
             if x == 0 {
-                output.push('\n');
+                acc.push('\n');
             }
 
-            if sprite - 1 == x || sprite == x || sprite + 1 == x {
-                output.push('#');
+            if ((sprite - 1)..=(sprite + 1)).contains(&x) {
+                acc.push('#');
             } else {
-                output.push('.');
+                acc.push('.');
             }
 
-            output
+            acc
         },
     )
 }

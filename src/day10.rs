@@ -1,3 +1,4 @@
+use advent_of_code_ocr as aoc_ocr;
 use aoc_runner_derive::{aoc, aoc_generator};
 use eyre::bail;
 use itertools::iproduct;
@@ -62,7 +63,7 @@ fn part1(input: &[Instruction]) -> i32 {
 
 #[aoc(day10, part2)]
 fn part2(input: &[Instruction]) -> String {
-    iproduct!((0..6), (0..40)).zip(execute(input)).fold(
+    let screen = iproduct!((0..6), (0..40)).zip(execute(input)).fold(
         String::with_capacity(6 * 40 + 6),
         |mut acc, ((_, x), sprite)| {
             if x == 0 {
@@ -77,5 +78,7 @@ fn part2(input: &[Instruction]) -> String {
 
             acc
         },
-    )
+    );
+
+    aoc_ocr::parse_string_to_letters(&screen)
 }

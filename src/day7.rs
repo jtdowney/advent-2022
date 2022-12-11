@@ -6,11 +6,12 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
     character::complete::{space1, u32},
-    combinator::map,
+    combinator::{map, value},
     sequence::{preceded, separated_pair, tuple},
     Finish, IResult,
 };
 
+#[derive(Clone)]
 enum Token {
     ChangeDirectory { target: String },
     List,
@@ -26,7 +27,7 @@ fn parse_path(input: &str) -> IResult<&str, String> {
 }
 
 fn parse_command(input: &str) -> IResult<&str, Token> {
-    let parse_ls = map(tag("ls"), |_| Token::List);
+    let parse_ls = value(Token::List, tag("ls"));
     let parse_cd = map(preceded(tuple((tag("cd"), space1)), parse_path), |target| {
         Token::ChangeDirectory { target }
     });

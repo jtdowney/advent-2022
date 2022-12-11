@@ -6,19 +6,20 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{i32, space1},
-    combinator::map,
+    combinator::{map, value},
     sequence::{preceded, tuple},
     IResult,
 };
 use smallvec::{smallvec, SmallVec};
 
+#[derive(Copy, Clone)]
 enum Instruction {
     Noop,
     AddX(i32),
 }
 
 fn parse_instruction(input: &str) -> IResult<&str, Instruction> {
-    let parse_noop = map(tag("noop"), |_| Instruction::Noop);
+    let parse_noop = value(Instruction::Noop, tag("noop"));
     let parse_addx = map(preceded(tuple((tag("addx"), space1)), i32), |value| {
         Instruction::AddX(value)
     });

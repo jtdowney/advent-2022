@@ -5,7 +5,7 @@ use eyre::bail;
 use nom::{
     branch::alt,
     character::complete::{char, space1, u32},
-    combinator::map,
+    combinator::{map, value},
     sequence::separated_pair,
     IResult,
 };
@@ -40,16 +40,12 @@ impl<const N: usize> Default for State<N> {
 }
 
 fn parse_direction(input: &str) -> IResult<&str, Direction> {
-    map(
-        alt((char('U'), char('D'), char('L'), char('R'))),
-        |c| match c {
-            'U' => Direction::Up,
-            'D' => Direction::Down,
-            'L' => Direction::Left,
-            'R' => Direction::Right,
-            _ => unreachable!(),
-        },
-    )(input)
+    alt((
+        value(Direction::Up, char('U')),
+        value(Direction::Down, char('D')),
+        value(Direction::Left, char('L')),
+        value(Direction::Right, char('R')),
+    ))(input)
 }
 
 fn parse_instruction(input: &str) -> IResult<&str, Instruction> {

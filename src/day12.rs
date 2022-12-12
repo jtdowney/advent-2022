@@ -1,17 +1,12 @@
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap},
-    iter,
 };
 
 use aoc_runner_derive::{aoc, aoc_generator};
 use itertools::Itertools;
 
 type Point = (i32, i32);
-
-fn distance((ax, ay): Point, (bx, by): Point) -> i32 {
-    (ax - bx).abs() + (ay - by).abs()
-}
 
 #[derive(Clone, Debug, Default)]
 struct Grid {
@@ -23,7 +18,7 @@ struct Grid {
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 struct Search {
     point: Point,
-    score: u32,
+    distance: u32,
 }
 
 impl PartialOrd for Search {
@@ -34,7 +29,7 @@ impl PartialOrd for Search {
 
 impl Ord for Search {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.score.cmp(&self.score)
+        other.distance.cmp(&self.distance)
     }
 }
 
@@ -66,21 +61,19 @@ fn generator(input: &str) -> Grid {
         })
 }
 
-fn find_shortest_path(grid: &Grid, start: Point) -> Option<usize> {
+fn find_shortest_path(grid: &Grid, start: Point) -> Option<u32> {
     let mut search = BinaryHeap::new();
     search.push(Search {
         point: start,
-        score: distance(start, grid.end) as u32,
+        distance: 0,
     });
 
-    let mut path = HashMap::new();
-    let mut scores = HashMap::new();
-    scores.insert(start, 0);
+    let mut distances = HashMap::new();
+    distances.insert(start, 0);
 
     while let Some(current) = search.pop() {
         if current.point == grid.end {
-            let steps = iter::successors(Some(&grid.end), |&point| path.get(point)).count() - 1;
-            return Some(steps);
+            return distances.get(&grid.end).copied();
         }
 
         let (x, y) = current.point;
@@ -94,17 +87,14 @@ fn find_shortest_path(grid: &Grid, start: Point) -> Option<usize> {
                 neighbor_height <= current_height + 1
             });
         for neighbor in neighbors {
-            let tentative_score = scores[&current.point] + 1;
-            let neighbor_score = scores.get(&neighbor).copied().unwrap_or(u32::MAX);
-            if tentative_score < neighbor_score {
-                path.insert(neighbor, current.point);
-                scores.insert(neighbor, tentative_score);
-
-                let candidate = Search {
+            let neighbor_distance = current.distance + 1;
+            let existing_distance = distances.get(&neighbor).copied().unwrap_or(u32::MAX);
+            if neighbor_distance < existing_distance {
+                distances.insert(neighbor, neighbor_distance);
+                search.push(Search {
                     point: neighbor,
-                    score: tentative_score + distance(neighbor, grid.end) as u32,
-                };
-                search.push(candidate);
+                    distance: neighbor_distance,
+                });
             }
         }
     }
@@ -113,12 +103,12 @@ fn find_shortest_path(grid: &Grid, start: Point) -> Option<usize> {
 }
 
 #[aoc(day12, part1)]
-fn part1(input: &Grid) -> Option<usize> {
+fn part1(input: &Grid) -> Option<u32> {
     find_shortest_path(input, input.start)
 }
 
 #[aoc(day12, part2)]
-fn part2(input: &Grid) -> Option<usize> {
+fn part2(input: &Grid) -> Option<u32> {
     input
         .map
         .iter()

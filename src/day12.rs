@@ -1,10 +1,9 @@
 use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, HashMap},
+    collections::{HashMap, HashSet, VecDeque},
+    iter,
 };
 
 use aoc_runner_derive::{aoc, aoc_generator};
-use itertools::Itertools;
 
 type Point = (i32, i32);
 
@@ -13,24 +12,6 @@ struct Grid {
     start: Point,
     end: Point,
     map: HashMap<Point, u8>,
-}
-
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-struct Search {
-    point: Point,
-    distance: u32,
-}
-
-impl PartialOrd for Search {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Search {
-    fn cmp(&self, other: &Self) -> Ordering {
-        other.distance.cmp(&self.distance)
-    }
 }
 
 #[aoc_generator(day12)]
@@ -61,41 +42,35 @@ fn generator(input: &str) -> Grid {
         })
 }
 
-fn find_shortest_path(grid: &Grid, start: Point) -> Option<u32> {
-    let mut search = BinaryHeap::new();
-    search.push(Search {
-        point: start,
-        distance: 0,
-    });
+fn find_shortest_path(grid: &Grid, start: Point) -> Option<usize> {
+    let mut path = HashMap::<Point, Point>::new();
+    let mut visited = HashSet::new();
+    visited.insert(start);
 
-    let mut distances = HashMap::new();
-    distances.insert(start, 0);
+    let mut search = VecDeque::new();
+    search.push_back(start);
 
-    while let Some(current) = search.pop() {
-        if current.point == grid.end {
-            return distances.get(&grid.end).copied();
+    while let Some(current @ (x, y)) = search.pop_front() {
+        if current == grid.end {
+            let steps = iter::successors(Some(&current), |point| path.get(point)).count() - 1;
+            return Some(steps);
         }
 
-        let (x, y) = current.point;
-        let current_height = grid.map[&current.point];
+        let current_height = grid.map[&current];
         let neighbors = [(-1, 0), (0, 1), (1, 0), (0, -1)]
             .iter()
             .map(move |&(dx, dy)| (x + dx, y + dy))
+            .filter(|n| !visited.contains(n))
             .filter(|n| grid.map.contains_key(n))
             .filter(|n| {
                 let neighbor_height = grid.map[n];
                 neighbor_height <= current_height + 1
-            });
+            })
+            .collect::<Vec<_>>();
         for neighbor in neighbors {
-            let neighbor_distance = current.distance + 1;
-            let existing_distance = distances.get(&neighbor).copied().unwrap_or(u32::MAX);
-            if neighbor_distance < existing_distance {
-                distances.insert(neighbor, neighbor_distance);
-                search.push(Search {
-                    point: neighbor,
-                    distance: neighbor_distance,
-                });
-            }
+            visited.insert(neighbor);
+            path.insert(neighbor, current);
+            search.push_back(neighbor);
         }
     }
 
@@ -103,17 +78,18 @@ fn find_shortest_path(grid: &Grid, start: Point) -> Option<u32> {
 }
 
 #[aoc(day12, part1)]
-fn part1(input: &Grid) -> Option<u32> {
+fn part1(input: &Grid) -> Option<usize> {
     find_shortest_path(input, input.start)
 }
 
 #[aoc(day12, part2)]
-fn part2(input: &Grid) -> Option<u32> {
-    input
+fn part2(input: &Grid) -> Option<usize> {
+    let mut steps = input
         .map
         .iter()
         .filter(|(_, &height)| height == b'a')
         .filter_map(|(&start, _)| find_shortest_path(input, start))
-        .sorted()
-        .next()
+        .collect::<Vec<_>>();
+    steps.sort_unstable();
+    steps.first().copied()
 }

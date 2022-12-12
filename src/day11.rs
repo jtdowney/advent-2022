@@ -2,10 +2,11 @@ use std::collections::VecDeque;
 
 use aoc_runner_derive::{aoc, aoc_generator};
 use eyre::bail;
+use itertools::Itertools;
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{line_ending, space1, u64, u8},
+    character::complete::{line_ending, u64, u8},
     combinator::{map, value},
     multi::separated_list1,
     sequence::{preceded, tuple},
@@ -42,7 +43,7 @@ impl Monkey {
 fn parse_items(input: &str) -> IResult<&str, VecDeque<u64>> {
     map(
         preceded(tag("  Starting items: "), separated_list1(tag(", "), u64)),
-        |list| list.into(),
+        VecDeque::from,
     )(input)
 }
 
@@ -69,7 +70,8 @@ fn parse_throw<'a>(input: &'a str, result: &'static str) -> IResult<&'a str, usi
 }
 
 fn parse_monkey(input: &str) -> IResult<&str, Monkey> {
-    let (input, _) = tuple((tag("Monkey"), space1, u8, tag(":"), line_ending))(input)?;
+    let (input, _) = tuple((tag("Monkey "), u8, tag(":")))(input)?;
+    let (input, _) = line_ending(input)?;
     let (input, items) = parse_items(input)?;
     let (input, _) = line_ending(input)?;
     let (input, operation) = parse_operation(input)?;
@@ -114,6 +116,7 @@ where
                 let test = monkeys[i].test;
                 let throw_true = monkeys[i].throw_true;
                 let throw_false = monkeys[i].throw_false;
+
                 let level = monkeys[i].inspect(item);
                 let level = reducer(level);
                 if level % test == 0 {
@@ -127,9 +130,13 @@ where
         }
     }
 
-    let mut inspected = monkeys.iter().map(|m| m.inspected).collect::<Vec<_>>();
-    inspected.sort_unstable();
-    inspected.iter().rev().take(2).product()
+    monkeys
+        .iter()
+        .map(|m| m.inspected)
+        .sorted()
+        .rev()
+        .take(2)
+        .product()
 }
 
 #[aoc(day11, part1)]
@@ -139,6 +146,6 @@ fn part1(input: &[Monkey]) -> usize {
 
 #[aoc(day11, part2)]
 fn part2(input: &[Monkey]) -> usize {
-    let product = input.iter().map(|m| m.test).product::<u64>();
+    let product: u64 = input.iter().map(|m| m.test).product();
     solve(input, 10000, |level| level % product)
 }

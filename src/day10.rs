@@ -20,9 +20,10 @@ enum Instruction {
 
 fn parse_instruction(input: &str) -> IResult<&str, Instruction> {
     let parse_noop = value(Instruction::Noop, tag("noop"));
-    let parse_addx = map(preceded(tuple((tag("addx"), space1)), i32), |value| {
-        Instruction::AddX(value)
-    });
+    let parse_addx = map(
+        preceded(tuple((tag("addx"), space1)), i32),
+        Instruction::AddX,
+    );
 
     alt((parse_noop, parse_addx))(input)
 }

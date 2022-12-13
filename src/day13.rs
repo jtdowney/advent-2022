@@ -67,7 +67,7 @@ fn part1(input: &[(Packet, Packet)]) -> usize {
     input
         .iter()
         .zip(1..)
-        .filter(|((left, right), _)| left.cmp(right) == Ordering::Less)
+        .filter(|((left, right), _)| left < right)
         .map(|(_, i)| i)
         .sum()
 }

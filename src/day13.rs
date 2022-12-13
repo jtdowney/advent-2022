@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashSet};
+use std::cmp::Ordering;
 
 use aoc_runner_derive::{aoc, aoc_generator};
 use eyre::bail;
@@ -74,25 +74,20 @@ fn part1(input: &[(Packet, Packet)]) -> usize {
 
 #[aoc(day13, part2)]
 fn part2(input: &[(Packet, Packet)]) -> usize {
-    let dividers = HashSet::from([
+    let dividers = vec![
         Packet::List(vec![Packet::List(vec![Packet::Value(2)])]),
         Packet::List(vec![Packet::List(vec![Packet::Value(6)])]),
-    ]);
-
+    ];
     let input = input.to_vec();
     let (left, right): (Vec<Packet>, Vec<Packet>) = input.into_iter().unzip();
-    let mut packets = left
+    let packets = left
         .into_iter()
         .chain(right)
         .chain(dividers.clone())
         .collect::<Vec<_>>();
 
-    packets.sort();
-    packets
+    dividers
         .iter()
-        .zip(1..)
-        .filter(|(packet, _)| dividers.contains(packet))
-        .take(dividers.len())
-        .map(|(_, i)| i)
+        .map(|divider| packets.iter().filter(|&packet| packet < divider).count() + 1)
         .product()
 }

@@ -1,11 +1,10 @@
-use std::{cmp::Ordering, collections::HashSet, iter};
+use std::{cmp::Ordering, collections::HashSet};
 
 use aoc_runner_derive::{aoc, aoc_generator};
 use eyre::bail;
 use nom::{
     branch::alt,
-    bytes::complete::tag,
-    character::complete::{line_ending, u32},
+    character::complete::{char, line_ending, u32},
     combinator::{complete, map},
     multi::{separated_list0, separated_list1},
     sequence::{delimited, separated_pair, tuple},
@@ -13,63 +12,42 @@ use nom::{
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-enum Value {
-    Literal(u32),
-    List(Vec<Value>),
+enum Packet {
+    Value(u32),
+    List(Vec<Packet>),
 }
 
-impl PartialOrd for Value {
+impl PartialOrd for Packet {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Value {
+impl Ord for Packet {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
-            (Value::Literal(lhs), Value::Literal(rhs)) => lhs.cmp(rhs),
-            (Value::List(lhs), Value::List(rhs)) => {
-                for (l, r) in iter::zip(lhs, rhs) {
-                    match l.cmp(r) {
-                        Ordering::Equal => continue,
-                        o => return o,
-                    }
-                }
-
-                lhs.len().cmp(&rhs.len())
-            }
-            (Value::Literal(lhs), Value::List(_)) => {
-                let new_lhs = Value::List(vec![Value::Literal(*lhs)]);
-                new_lhs.cmp(other)
-            }
-            (Value::List(_), Value::Literal(rhs)) => {
-                let new_rhs = Value::List(vec![Value::Literal(*rhs)]);
-                self.cmp(&new_rhs)
-            }
+            (Packet::Value(lhs), Packet::Value(rhs)) => lhs.cmp(rhs),
+            (Packet::List(lhs), Packet::List(rhs)) => lhs.cmp(rhs),
+            (Packet::Value(lhs), Packet::List(rhs)) => vec![Packet::Value(*lhs)].cmp(rhs),
+            (Packet::List(lhs), Packet::Value(rhs)) => lhs.cmp(&vec![Packet::Value(*rhs)]),
         }
     }
 }
 
-fn parse_literal(input: &str) -> IResult<&str, Value> {
-    map(u32, Value::Literal)(input)
-}
-
-fn parse_list(input: &str) -> IResult<&str, Value> {
+fn parse_packet(input: &str) -> IResult<&str, Packet> {
+    let parse_value = map(u32, Packet::Value);
     map(
         delimited(
-            tag("["),
-            separated_list0(tag(","), alt((parse_literal, parse_list))),
-            tag("]"),
+            char('['),
+            separated_list0(char(','), alt((parse_value, parse_packet))),
+            char(']'),
         ),
-        Value::List,
+        Packet::List,
     )(input)
 }
 
-fn parse_pair(input: &str) -> IResult<&str, (Value, Value)> {
-    separated_pair(parse_list, line_ending, parse_list)(input)
-}
-
-fn parse_input(input: &str) -> IResult<&str, Vec<(Value, Value)>> {
+fn parse_input(input: &str) -> IResult<&str, Vec<(Packet, Packet)>> {
+    let parse_pair = separated_pair(parse_packet, line_ending, parse_packet);
     complete(separated_list1(
         tuple((line_ending, line_ending)),
         parse_pair,
@@ -77,7 +55,7 @@ fn parse_input(input: &str) -> IResult<&str, Vec<(Value, Value)>> {
 }
 
 #[aoc_generator(day13)]
-fn generator(input: &str) -> eyre::Result<Vec<(Value, Value)>> {
+fn generator(input: &str) -> eyre::Result<Vec<(Packet, Packet)>> {
     match parse_input(input) {
         Ok((_, i)) => Ok(i),
         Err(e) => bail!("error parsing: {}", e),
@@ -85,7 +63,7 @@ fn generator(input: &str) -> eyre::Result<Vec<(Value, Value)>> {
 }
 
 #[aoc(day13, part1)]
-fn part1(input: &[(Value, Value)]) -> usize {
+fn part1(input: &[(Packet, Packet)]) -> usize {
     input
         .iter()
         .zip(1..)
@@ -95,13 +73,14 @@ fn part1(input: &[(Value, Value)]) -> usize {
 }
 
 #[aoc(day13, part2)]
-fn part2(input: &[(Value, Value)]) -> usize {
-    let mut dividers = HashSet::new();
-    dividers.insert(Value::List(vec![Value::List(vec![Value::Literal(2)])]));
-    dividers.insert(Value::List(vec![Value::List(vec![Value::Literal(6)])]));
+fn part2(input: &[(Packet, Packet)]) -> usize {
+    let dividers = HashSet::from([
+        Packet::List(vec![Packet::List(vec![Packet::Value(2)])]),
+        Packet::List(vec![Packet::List(vec![Packet::Value(6)])]),
+    ]);
 
     let input = input.to_vec();
-    let (left, right): (Vec<Value>, Vec<Value>) = input.into_iter().unzip();
+    let (left, right): (Vec<Packet>, Vec<Packet>) = input.into_iter().unzip();
     let mut packets = left
         .into_iter()
         .chain(right)
@@ -113,6 +92,7 @@ fn part2(input: &[(Value, Value)]) -> usize {
         .iter()
         .zip(1..)
         .filter(|(packet, _)| dividers.contains(packet))
+        .take(dividers.len())
         .map(|(_, i)| i)
         .product()
 }

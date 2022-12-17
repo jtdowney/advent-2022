@@ -2,7 +2,7 @@ use std::{collections::HashMap, iter};
 
 use aoc_runner_derive::{aoc, aoc_generator};
 use eyre::eyre;
-use itertools::iproduct;
+use itertools::{iproduct, Itertools};
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -12,12 +12,16 @@ use nom::{
     sequence::tuple,
     Finish, IResult,
 };
+use smallvec::{smallvec, SmallVec};
+
+const START: &str = "AA";
 
 #[derive(Debug, Default)]
 struct Input {
     names: Vec<String>,
     flow_rates: Vec<u32>,
     connections: Vec<Vec<String>>,
+    distances: HashMap<(usize, usize), u8>,
 }
 
 fn parse_valve(input: &str) -> IResult<&str, (String, u32, Vec<String>)> {
@@ -39,34 +43,14 @@ fn parse_valve(input: &str) -> IResult<&str, (String, u32, Vec<String>)> {
     )(input)
 }
 
-#[aoc_generator(day16)]
-fn generator(input: &str) -> eyre::Result<Input> {
-    input
-        .lines()
-        .map(|line| {
-            parse_valve(line)
-                .finish()
-                .map_err(|e| eyre!("Error parsing {}: {}", line, e))
-                .map(|(_, o)| o)
-        })
-        .try_fold(Input::default(), |mut acc, item| {
-            let (name, flow_rate, connections) = item?;
-            acc.names.push(name);
-            acc.flow_rates.push(flow_rate);
-            acc.connections.push(connections);
-            Ok(acc)
-        })
-}
-
-fn compute_distances(input: &Input) -> HashMap<(usize, usize), u8> {
-    let length = input.names.len();
-    let mut distances = input
-        .names
+fn compute_distances(names: &[String], connections: &[Vec<String>]) -> HashMap<(usize, usize), u8> {
+    let length = names.len();
+    let mut distances = names
         .iter()
         .enumerate()
         .flat_map(|(i, _)| {
-            iter::once(((i, i), 0)).chain(input.connections[i].iter().map(move |connection| {
-                let j = input.names.iter().position(|n| n == connection).unwrap();
+            iter::once(((i, i), 0)).chain(connections[i].iter().map(move |connection| {
+                let j = names.iter().position(|n| n == connection).unwrap();
                 ((i, j), 1)
             }))
         })
@@ -85,35 +69,53 @@ fn compute_distances(input: &Input) -> HashMap<(usize, usize), u8> {
     distances
 }
 
+#[aoc_generator(day16)]
+fn generator(input: &str) -> eyre::Result<Input> {
+    let mut result = input
+        .lines()
+        .map(|line| {
+            parse_valve(line)
+                .finish()
+                .map_err(|e| eyre!("Error parsing {}: {}", line, e))
+                .map(|(_, o)| o)
+        })
+        .try_fold(Input::default(), |mut acc, item| {
+            let (name, flow_rate, connections) = item?;
+            acc.names.push(name);
+            acc.flow_rates.push(flow_rate);
+            acc.connections.push(connections);
+            Ok::<_, eyre::Report>(acc)
+        })?;
+    result.distances = compute_distances(&result.names, &result.connections);
+    Ok(result)
+}
+
 fn search(
     input: &Input,
     current: usize,
-    rest: Vec<usize>,
+    candidates: Vec<usize>,
     time: u8,
-    distances: &HashMap<(usize, usize), u8>,
     elephant: bool,
     cache: &mut HashMap<(usize, Vec<usize>, bool, u8), u32>,
 ) -> u32 {
-    if let Some(&value) = cache.get(&(current, rest.clone(), elephant, time)) {
+    if let Some(&value) = cache.get(&(current, candidates.clone(), elephant, time)) {
         return value;
     }
 
-    let result = rest
+    let result = candidates
         .iter()
-        .enumerate()
-        .filter(|(_, &c)| distances[&(current, c)] < time)
-        .flat_map(|(i, _)| {
-            let mut results = vec![];
-            let mut candidates = rest.clone();
-            let next = candidates.swap_remove(i);
-            let time_remaining = time - distances[&(current, next)] - 1;
-            let next_rate = input.flow_rates[next] * time_remaining as u32;
+        .positions(|&c| input.distances[&(current, c)] < time)
+        .flat_map(|i| {
+            let mut results: SmallVec<[u32; 2]> = smallvec![];
+            let mut next_candidates = candidates.clone();
+            let next = next_candidates.swap_remove(i);
+            let next_time_remaining = time - input.distances[&(current, next)] - 1;
+            let next_rate = input.flow_rates[next] * next_time_remaining as u32;
             let future_rate = search(
                 input,
                 next,
-                candidates.clone(),
-                time_remaining,
-                distances,
+                next_candidates,
+                next_time_remaining,
                 elephant,
                 cache,
             );
@@ -123,7 +125,7 @@ fn search(
 
             if elephant {
                 let start = input.names.iter().position(|n| n == "AA").unwrap();
-                let answer = search(input, start, rest.clone(), 26, distances, false, cache);
+                let answer = search(input, start, candidates.clone(), 26, false, cache);
                 results.push(answer);
             }
 
@@ -131,36 +133,22 @@ fn search(
         })
         .max()
         .unwrap_or_default();
-    cache.insert((current, rest, elephant, time), result);
+    cache.insert((current, candidates, elephant, time), result);
     result
 }
 
 #[aoc(day16, part1)]
 fn part1(input: &Input) -> u32 {
-    let distances = compute_distances(input);
-    let candidates = input
-        .flow_rates
-        .iter()
-        .enumerate()
-        .filter(|(_, &r)| r > 0)
-        .map(|(i, _)| i)
-        .collect::<Vec<_>>();
-    let start = input.names.iter().position(|n| n == "AA").unwrap();
+    let candidates = input.flow_rates.iter().positions(|&r| r > 0).collect_vec();
+    let start = input.names.iter().position(|n| n == START).unwrap();
     let mut cache = HashMap::new();
-    search(input, start, candidates, 30, &distances, false, &mut cache)
+    search(input, start, candidates, 30, false, &mut cache)
 }
 
 #[aoc(day16, part2)]
 fn part2(input: &Input) -> u32 {
-    let distances = compute_distances(input);
-    let candidates = input
-        .flow_rates
-        .iter()
-        .enumerate()
-        .filter(|(_, &r)| r > 0)
-        .map(|(i, _)| i)
-        .collect::<Vec<_>>();
-    let start = input.names.iter().position(|n| n == "AA").unwrap();
+    let candidates = input.flow_rates.iter().positions(|&r| r > 0).collect_vec();
+    let start = input.names.iter().position(|n| n == START).unwrap();
     let mut cache = HashMap::new();
-    search(input, start, candidates, 26, &distances, true, &mut cache)
+    search(input, start, candidates, 26, true, &mut cache)
 }
